@@ -218,9 +218,23 @@ int main(int argc, char **argv) {
 
 	// Save the flip-unique tiles to a new PNG
 	tilew = flippedsum >= 16 ? 16 : flippedsum;
-	tileh = flippedsum >= 16 ? flippedsum / 16 : 1;
+	tileh = flippedsum / 16;
+	if (flippedsum % 16)
+		tileh++;
 
 	u8 *newdata = (u8 *) calloc(tilew * tileh, 64 * 3);
+	const u32 dwtile = tilew * 8 * 3 * 8;
+	const u32 dwrow = tilew * 8 * 3;
+
+	i = 0;
+	for (set<tile_t>::const_iterator it = normal.begin(); it != normal.end(); it++, i++) {
+		const u32 row = i / tilew;
+		const u32 col = i % tilew;
+		for (y = 0; y < 8; y++) {
+			memcpy(newdata + row * dwtile + y * dwrow + col * 8 * 3,
+				it->data + y * 8 * 3, 8 * 3);
+		}
+	}
 
 	savepng(outname, newdata, tilew, tileh);
 
