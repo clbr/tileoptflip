@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <limits.h>
 #include <png.h>
 
 #include <algorithm>
