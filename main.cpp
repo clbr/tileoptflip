@@ -66,6 +66,37 @@ static void loadpng(const char name[], u8 **outdata, u32 *w, u32 *h) {
 	*h = imgh;
 }
 
+static void savepng(const char * const name, const u8 * const data,
+			const u8 tilew, const u16 tileh) {
+
+	const u32 w = tilew * 8;
+	const u32 h = tileh * 8;
+
+	FILE *f = fopen(name, "w");
+	if (!f)
+		die("Can't open %s for writing\n", name);
+
+	png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	if (!png_ptr) abort();
+	png_infop info = png_create_info_struct(png_ptr);
+	if (!info) abort();
+	if (setjmp(png_jmpbuf(png_ptr))) abort();
+
+	png_init_io(png_ptr, f);
+	png_set_IHDR(png_ptr, info, w, h, 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+		PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+	png_write_info(png_ptr, info);
+
+	u32 i;
+	for (i = 0; i < h; i++) {
+		png_write_row(png_ptr, (png_byte *) data + i * w * 3);
+	}
+	png_write_end(png_ptr, NULL);
+	png_destroy_info_struct(png_ptr, &info);
+	png_destroy_write_struct(&png_ptr, NULL);
+	fclose(f);
+}
+
 struct tile_t {
 	u8 data[64*3];
 
@@ -146,6 +177,7 @@ int main(int argc, char **argv) {
 		if (pix != 8) die("BUG, pix %u\n", pix);
 	}
 
+	free(tilemap);
 	sort(tiles.begin(), tiles.end());
 
 	set<tile_t> normal, fliph, flipv, flipvh;
@@ -184,6 +216,14 @@ int main(int argc, char **argv) {
 	printf("%u tiles, with flips\n\n",
 		flippedsum);
 
-	free(tilemap);
+	// Save the flip-unique tiles to a new PNG
+	tilew = flippedsum >= 16 ? 16 : flippedsum;
+	tileh = flippedsum >= 16 ? flippedsum / 16 : 1;
+
+	u8 *newdata = (u8 *) calloc(tilew * tileh, 64 * 3);
+
+	savepng(outname, newdata, tilew, tileh);
+
+	free(newdata);
 	return retval;
 }
