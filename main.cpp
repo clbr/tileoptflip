@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
 		outname = outnamebuf;
 	}
 
-	memcpy(tmpnamebuf, outname, PATH_MAX);
+	strncpy(tmpnamebuf, outname, PATH_MAX);
 	const u32 namelen = strlen(outname);
 	tmpnamebuf[namelen - 3] = 't';
 	tmpnamebuf[namelen - 2] = 'm';
