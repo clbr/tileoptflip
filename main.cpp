@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <png.h>
 
 #include <algorithm>
@@ -129,13 +130,11 @@ static void vertflip(const struct tile_t &src, struct tile_t &dst) {
 
 int main(int argc, char **argv) {
 
-	u8 retval = 0;
-
 	if (argc < 2) {
 		die("Usage: %s image.png [outname]\n", argv[0]);
 	}
 
-	char outnamebuf[PATH_MAX], *outname;
+	char outnamebuf[PATH_MAX], *outname, tmpnamebuf[PATH_MAX];
 	if (argc > 2) {
 		outname = argv[2];
 	} else {
@@ -147,6 +146,12 @@ int main(int argc, char **argv) {
 		strcat(outnamebuf, "_opt.png");
 		outname = outnamebuf;
 	}
+
+	memcpy(tmpnamebuf, outname, PATH_MAX);
+	const u32 namelen = strlen(outname);
+	tmpnamebuf[namelen - 3] = 't';
+	tmpnamebuf[namelen - 2] = 'm';
+	tmpnamebuf[namelen - 1] = 'p';
 
 	u8 *tilemap;
 	u32 tilew, tileh, x, y;
@@ -239,5 +244,22 @@ int main(int argc, char **argv) {
 	savepng(outname, newdata, tilew, tileh);
 
 	free(newdata);
-	return retval;
+
+	// Convert to paletted
+	char execbuf[PATH_MAX];
+	snprintf(execbuf, PATH_MAX, "/opt/imagemagick/bin/convert %s PNG8:%s",
+		outname, tmpnamebuf);
+	execbuf[PATH_MAX - 1] = '\0';
+	system(execbuf);
+
+	if (rename(tmpnamebuf, outname))
+		die("Rename failed with %d (%s)\n", errno, strerror(errno));
+
+	// Remap
+	snprintf(execbuf, PATH_MAX, "pngreorder -s %s %s",
+		argv[1], outname);
+	execbuf[PATH_MAX - 1] = '\0';
+	system(execbuf);
+
+	return 0;
 }
