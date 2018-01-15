@@ -101,7 +101,20 @@ int main(int argc, char **argv) {
 	u8 retval = 0;
 
 	if (argc < 2) {
-		die("Usage: %s image.png\n", argv[0]);
+		die("Usage: %s image.png [outname]\n", argv[0]);
+	}
+
+	char outnamebuf[PATH_MAX], *outname;
+	if (argc > 2) {
+		outname = argv[2];
+	} else {
+		strncpy(outnamebuf, argv[1], PATH_MAX);
+		outnamebuf[PATH_MAX - 1] = '\0';
+		const u32 len = strlen(outnamebuf);
+		if (len > PATH_MAX - 5) die("Path too long\n");
+		outnamebuf[len - 4] = '\0';
+		strcat(outnamebuf, "_opt.png");
+		outname = outnamebuf;
 	}
 
 	u8 *tilemap;
@@ -138,10 +151,8 @@ int main(int argc, char **argv) {
 	set<tile_t> normal, fliph, flipv, flipvh;
 	uniques.push_back(tiles[0]);
 
-	u32 sum = 1;
 	for (i = 1; i < numtiles; i++) {
 		if (!(tiles[i - 1] == tiles[i])) {
-			sum++;
 			uniques.push_back(tiles[i]);
 		}
 	}
@@ -170,8 +181,8 @@ int main(int argc, char **argv) {
 		flippedsum++;
 	}
 
-	printf("%u tiles (%u if flips allowed).\n\n",
-		sum, flippedsum);
+	printf("%u tiles, with flips\n\n",
+		flippedsum);
 
 	free(tilemap);
 	return retval;
