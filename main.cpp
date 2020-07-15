@@ -25,12 +25,11 @@
 
 #include "common.h"
 
-using namespace std;
+#define SIDE 16
+#define AREA (SIDE * SIDE)
+#define TILES_PER_OUTROW (128 / SIDE)
 
-static void diegui(const char msg[]) {
-	printf("%s\n", msg);
-	exit(1);
-}
+using namespace std;
 
 static void loadpng(const char name[], u8 **outdata, u32 *w, u32 *h) {
 
@@ -56,8 +55,8 @@ static void loadpng(const char name[], u8 **outdata, u32 *w, u32 *h) {
 	const u8 type = png_get_color_type(png_ptr, info);
 	const u8 depth = png_get_bit_depth(png_ptr, info);
 
-	if (imgw % 8 != 0 || imgh % 8 != 0)
-		diegui("Error: Image is not divisible by 8!");
+	if (imgw % SIDE != 0 || imgh % SIDE != 0)
+		die("Error: Image is not divisible by %u!\n", SIDE);
 
 	if (type != PNG_COLOR_TYPE_RGB)
 		die("Input must be a paletted PNG, got %u\n", type);
@@ -88,8 +87,8 @@ static void loadpng(const char name[], u8 **outdata, u32 *w, u32 *h) {
 static void savepng(const char * const name, const u8 * const data,
 			const u8 tilew, const u16 tileh) {
 
-	const u32 w = tilew * 8;
-	const u32 h = tileh * 8;
+	const u32 w = tilew * SIDE;
+	const u32 h = tileh * SIDE;
 
 	FILE *f = fopen(name, "w");
 	if (!f)
@@ -117,32 +116,32 @@ static void savepng(const char * const name, const u8 * const data,
 }
 
 struct tile_t {
-	u8 data[64*3];
+	u8 data[AREA * 3];
 
 	bool operator <(const tile_t &other) const {
-		return memcmp(data, other.data, 64*3) < 0;
+		return memcmp(data, other.data, AREA * 3) < 0;
 	}
 
 	bool operator ==(const tile_t &other) const {
-		return memcmp(data, other.data, 64*3) == 0;
+		return memcmp(data, other.data, AREA * 3) == 0;
 	}
 };
 
 static void horzflip(const struct tile_t &src, struct tile_t &dst) {
 	u8 i, x;
-	for (i = 0; i < 8; i++) {
-		for (x = 0; x < 8; x++) {
-			dst.data[i * 8 * 3 + x * 3 + 0] = src.data[i * 8 * 3 + (7 - x) * 3 + 0];
-			dst.data[i * 8 * 3 + x * 3 + 1] = src.data[i * 8 * 3 + (7 - x) * 3 + 1];
-			dst.data[i * 8 * 3 + x * 3 + 2] = src.data[i * 8 * 3 + (7 - x) * 3 + 2];
+	for (i = 0; i < SIDE; i++) {
+		for (x = 0; x < SIDE; x++) {
+			dst.data[i * SIDE * 3 + x * 3 + 0] = src.data[i * SIDE * 3 + (SIDE - 1 - x) * 3 + 0];
+			dst.data[i * SIDE * 3 + x * 3 + 1] = src.data[i * SIDE * 3 + (SIDE - 1 - x) * 3 + 1];
+			dst.data[i * SIDE * 3 + x * 3 + 2] = src.data[i * SIDE * 3 + (SIDE - 1 - x) * 3 + 2];
 		}
 	}
 }
 
 static void vertflip(const struct tile_t &src, struct tile_t &dst) {
 	u8 i;
-	for (i = 0; i < 8; i++) {
-		memcpy(&dst.data[(7 - i) * 8 * 3], &src.data[i * 8 * 3], 8 * 3);
+	for (i = 0; i < SIDE; i++) {
+		memcpy(&dst.data[(SIDE - 1 - i) * SIDE * 3], &src.data[i * SIDE * 3], SIDE * 3);
 	}
 }
 
@@ -177,27 +176,27 @@ int main(int argc, char **argv) {
 	loadpng(argv[1], &tilemap, &tilew, &tileh);
 
 	// Preprocess the tilemap into an easy-to-search format.
-	const u32 numtiles = tilew * tileh / 64;
+	const u32 numtiles = tilew * tileh / AREA;
 	vector<tile_t> tiles, uniques;
 	tiles.resize(numtiles);
 
 	u32 i;
 	for (i = 0; i < numtiles; i++) {
-		y = (i * 8) / tilew;
-		x = (i * 8) % tilew;
+		y = (i * SIDE) / tilew;
+		x = (i * SIDE) % tilew;
 
-		y *= 8;
+		y *= SIDE;
 
-		const u32 endy = y + 8;
+		const u32 endy = y + SIDE;
 		const u32 starty = y;
 
 		u8 pix = 0;
 		for (y = starty; y < endy; y++) {
-			memcpy(tiles[i].data + pix * 3 * 8,
-				tilemap + y * tilew * 3 + x * 3, 3 * 8);
+			memcpy(tiles[i].data + pix * 3 * SIDE,
+				tilemap + y * tilew * 3 + x * 3, 3 * SIDE);
 			pix++;
 		}
-		if (pix != 8) die("BUG, pix %u\n", pix);
+		if (pix != SIDE) die("BUG, pix %u\n", pix);
 	}
 
 	free(tilemap);
@@ -236,26 +235,25 @@ int main(int argc, char **argv) {
 		flippedsum++;
 	}
 
-	printf("%u tiles, with flips\n\n",
-		flippedsum);
+	printf("%u %u-tiles, with flips\n\n", flippedsum, SIDE);
 
 	// Save the flip-unique tiles to a new PNG
-	tilew = flippedsum >= 16 ? 16 : flippedsum;
-	tileh = flippedsum / 16;
-	if (flippedsum % 16)
+	tilew = flippedsum >= TILES_PER_OUTROW ? TILES_PER_OUTROW : flippedsum;
+	tileh = flippedsum / TILES_PER_OUTROW;
+	if (flippedsum % TILES_PER_OUTROW)
 		tileh++;
 
-	u8 *newdata = (u8 *) calloc(tilew * tileh, 64 * 3);
-	const u32 dwtile = tilew * 8 * 3 * 8;
-	const u32 dwrow = tilew * 8 * 3;
+	u8 *newdata = (u8 *) calloc(tilew * tileh, AREA * 3);
+	const u32 dwtile = tilew * SIDE * 3 * SIDE;
+	const u32 dwrow = tilew * SIDE * 3;
 
 	i = 0;
 	for (set<tile_t>::const_iterator it = normal.begin(); it != normal.end(); it++, i++) {
 		const u32 row = i / tilew;
 		const u32 col = i % tilew;
-		for (y = 0; y < 8; y++) {
-			memcpy(newdata + row * dwtile + y * dwrow + col * 8 * 3,
-				it->data + y * 8 * 3, 8 * 3);
+		for (y = 0; y < SIDE; y++) {
+			memcpy(newdata + row * dwtile + y * dwrow + col * SIDE * 3,
+				it->data + y * SIDE * 3, SIDE * 3);
 		}
 	}
 

@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-name = tileoptflip
+name = tileoptflip16
 
 CXXFLAGS += -Wall -Wextra -g
 LDFLAGS += -Wl,-gc-sections -lpng
